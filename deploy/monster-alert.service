@@ -1,0 +1,23 @@
+[Unit]
+Description=Monster Alert AT — Austrian supermarket price watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=monsteralert
+Group=monsteralert
+WorkingDirectory=/opt/monster-alert
+EnvironmentFile=-/opt/monster-alert/.env
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=10
+
+# Hardening (safe defaults for a single-purpose background service)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/monster-alert
+
+[Install]
+WantedBy=multi-user.target

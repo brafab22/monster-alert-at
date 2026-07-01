@@ -54,3 +54,13 @@ export function detectPackSize(name) {
 export function calcPerUnit(priceEur, packSize) {
   return packSize > 0 ? priceEur / packSize : priceEur;
 }
+
+// ISO 8601 week key (e.g. "2026-W27"), used to dedupe flyer alerts per week
+export function isoWeekKey(date = new Date()) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}

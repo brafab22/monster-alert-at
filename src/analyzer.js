@@ -1,5 +1,5 @@
 import { getRollingAverage, insertPrice } from './db.js';
-import { sendDealNotification } from './notify.js';
+import { sendDealNotification, sendFlyerAlert } from './notify.js';
 
 const THRESHOLD = () => parseFloat(process.env.PRICE_THRESHOLD_EUR ?? '1.49');
 
@@ -30,4 +30,18 @@ export async function analyzeProducts(products, dryRun = false) {
   }
 
   return dealsFound;
+}
+
+// For flyer-only stores (ADEG, Nah&Frisch): no priceEur is available, so we
+// just alert on a "Monster mentioned" flyer match instead of a price deal.
+export async function checkFlyerMentions(mentions, dryRun = false) {
+  let count = 0;
+
+  for (const m of mentions) {
+    console.log(`[flyer] ${m.store} — ${m.note}`);
+    await sendFlyerAlert(m, dryRun);
+    count++;
+  }
+
+  return count;
 }

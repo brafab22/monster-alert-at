@@ -4,6 +4,9 @@
   "description": "Monitors Monster Energy prices on Austrian supermarket websites and sends push notifications on sale",
   "type": "module",
   "main": "src/index.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "start": "node src/index.js",
     "check": "node src/index.js --check-now",
@@ -14,6 +17,7 @@
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
     "node-cron": "^3.0.3",
+    "pdf-parse": "^1.1.1",
     "playwright": "^1.44.1"
   }
 }

@@ -1,12 +1,14 @@
 import 'dotenv/config';
 import cron from 'node-cron';
 import { pruneOldNotifications } from './db.js';
-import { analyzeProducts } from './analyzer.js';
+import { analyzeProducts, checkFlyerMentions } from './analyzer.js';
 import { scrape as scrapeBilla } from './scrapers/billa.js';
 import { scrape as scrapeSpar } from './scrapers/spar.js';
 import { scrape as scrapeHofer } from './scrapers/hofer.js';
 import { scrape as scrapePenny } from './scrapers/penny.js';
 import { scrape as scrapeLidl } from './scrapers/lidl.js';
+import { scrape as scrapeAdeg } from './scrapers/adeg.js';
+import { scrape as scrapeNahUndFrisch } from './scrapers/nahundfrisch.js';
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
@@ -17,21 +19,30 @@ async function runCheck() {
   pruneOldNotifications();
 
   const scrapers = [
-    { name: 'BILLA', fn: scrapeBilla },
-    { name: 'SPAR',  fn: scrapeSpar },
-    { name: 'Hofer', fn: scrapeHofer },
-    { name: 'Penny', fn: scrapePenny },
-    { name: 'Lidl',  fn: scrapeLidl },
+    { name: 'BILLA',       type: 'price', fn: scrapeBilla },
+    { name: 'SPAR',        type: 'price', fn: scrapeSpar },
+    { name: 'Hofer',       type: 'price', fn: scrapeHofer },
+    { name: 'Penny',       type: 'price', fn: scrapePenny },
+    { name: 'Lidl',        type: 'price', fn: scrapeLidl },
+    // ADEG and Nah&Frisch are franchise networks with no per-product online
+    // price data — they only get a best-effort "flyer mention" check (see
+    // src/scrapers/adeg.js and nahundfrisch.js for details).
+    { name: 'ADEG',        type: 'flyer', fn: scrapeAdeg },
+    { name: 'Nah&Frisch',  type: 'flyer', fn: scrapeNahUndFrisch },
   ];
 
   let totalDeals = 0;
 
-  for (const { name, fn } of scrapers) {
+  for (const { name, type, fn } of scrapers) {
     console.log(`[check] Scraping ${name}…`);
     try {
-      const products = await fn();
-      const deals = await analyzeProducts(products, DRY_RUN);
-      totalDeals += deals;
+      if (type === 'flyer') {
+        const mentions = await fn();
+        totalDeals += await checkFlyerMentions(mentions, DRY_RUN);
+      } else {
+        const products = await fn();
+        totalDeals += await analyzeProducts(products, DRY_RUN);
+      }
     } catch (err) {
       console.error(`[check] ${name} failed: ${err.message}`);
     }

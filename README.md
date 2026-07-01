@@ -1,6 +1,6 @@
 # monster-alert-at
 
-Monitors Monster Energy prices across Austrian supermarkets (BILLA, SPAR, Hofer, Penny, Lidl) and pushes a notification to your phone when a deal is detected.
+Monitors Monster Energy prices across Austrian supermarkets (BILLA, SPAR, Hofer, Penny, Lidl, ADEG, Nah&Frisch) and pushes a notification to your phone when a deal is detected.
 
 ---
 
@@ -25,8 +25,11 @@ Edit `.env`:
 | `NTFY_TOPIC` | Your unique ntfy.sh topic (keep it secret) | — |
 | `PRICE_THRESHOLD_EUR` | Alert when price/can drops below this | `1.49` |
 | `CHECK_INTERVAL_HOURS` | How often to check (hours) | `2` |
+| `ADEG_MARKT_URL` | Optional: your local ADEG market's flyer-viewer URL (see [ADEG](#adeg--nahfrisch-best-effort-flyer-only) below) | — |
 
 > **Tip:** pick a hard-to-guess topic name like `monster-alert-austria-xk9q2p`.
+
+> **Requires Node.js ≥ 22.5** (uses the built-in `node:sqlite` module). Skip this if you're using Docker — the image already pins a compatible version.
 
 ### 3. Set up ntfy on your phone
 
@@ -55,6 +58,38 @@ node src/index.js --dry-run --check-now
 ```bash
 node src/index.js
 ```
+
+---
+
+## Running as a systemd service on Ubuntu Server LTS
+
+This is the recommended way to run Monster Alert unattended on a bare-metal or VPS Ubuntu Server (tested target: 22.04 / 24.04 LTS). It installs Node.js, Playwright's Chromium (with its required system libraries), and a `systemd` unit that restarts on failure and starts on boot.
+
+```bash
+git clone <this-repo-url> monster-alert-at
+cd monster-alert-at
+sudo bash deploy/install-ubuntu.sh
+```
+
+The script copies the app to `/opt/monster-alert`, runs it as a dedicated unprivileged `monsteralert` system user, and creates `/opt/monster-alert/.env` from `.env.example` if it doesn't already exist.
+
+```bash
+# Edit config (at minimum, set NTFY_TOPIC)
+sudo nano /opt/monster-alert/.env
+
+# Start it
+sudo systemctl start monster-alert
+
+# Follow logs
+sudo journalctl -u monster-alert -f
+
+# Status / stop / restart
+sudo systemctl status monster-alert
+sudo systemctl stop monster-alert
+sudo systemctl restart monster-alert
+```
+
+To deploy an update later, pull the latest code and re-run `sudo bash deploy/install-ubuntu.sh` — it re-syncs the app, reinstalls dependencies, and restarts the systemd unit definition (run `sudo systemctl restart monster-alert` afterwards to pick up the new code).
 
 ---
 
@@ -128,13 +163,22 @@ docker compose up -d
 
 ## Supported stores
 
-| Store | Method |
-|---|---|
-| BILLA | JSON API |
-| SPAR | JSON API |
-| Hofer | HTML scrape (cheerio) |
-| Penny | HTML scrape (cheerio) |
-| Lidl | JSON API |
+| Store | Method | Exact price? |
+|---|---|---|
+| BILLA | JSON API | ✅ |
+| SPAR | JSON API | ✅ |
+| Hofer | HTML scrape (cheerio) | ✅ |
+| Penny | HTML scrape (cheerio) | ✅ |
+| Lidl | Playwright (rendered DOM) | ✅ |
+| ADEG | Best-effort flyer scan (Playwright) | ❌ mention only |
+| Nah&Frisch | Best-effort flyer scan (PDF text) | ❌ mention only |
+
+### ADEG / Nah&Frisch: best-effort, flyer-only
+
+ADEG and Nah&Frisch are franchise networks of independent local merchants — neither has a national online shop or per-product price feed like the other five chains. Their only public offer data is a weekly/monthly flyer:
+
+- **Nah&Frisch** publishes a "Dauertiefpreise" (permanent low price) PDF with real text. This scraper downloads it and checks whether "Monster" is mentioned anywhere — it can't reliably extract an exact per-can price from the PDF layout, so a match sends a *flyer-mention* alert instead of a price-deal alert (deduped once per ISO week).
+- **ADEG** has no page at all until you pick your local market, and each market's flyer is a pure image viewer with no text. Set `ADEG_MARKT_URL` in `.env` to your local market's flyer-viewer URL (find it via [adeg.at → ADEG Flugblatt](https://www.adeg.at/flugblatt-aktionen/adeg-flugblatt), select your market) to enable a best-effort scan of that page's text/image `alt` attributes. Leave it unset to skip ADEG entirely — this is expected and logged, not an error.
 
 ---
 

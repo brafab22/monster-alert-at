@@ -1,14 +1,10 @@
-FROM node:20-slim
-
-# Playwright needs some system libs even if we mostly use cheerio
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl \
- && rm -rf /var/lib/apt/lists/*
+FROM node:22-slim
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev \
+ && npx playwright install --with-deps chromium
 
 COPY . .
 
