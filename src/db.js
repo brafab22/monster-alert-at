@@ -79,3 +79,21 @@ export function pruneOldNotifications() {
     `DELETE FROM notified_deals WHERE notified_at < datetime('now', '-3 days')`
   ).run();
 }
+
+// Latest known price per store/variant/pack (one row per combo, most recent
+// scrape wins), used for the daily price-list summary. Ignores anything
+// older than 2 days so a long-broken scraper doesn't silently report a
+// stale price as "current".
+export function getLatestPrices() {
+  return getDb().prepare(`
+    SELECT store, product, variant, pack_size AS packSize, price_eur AS priceEur,
+           per_unit AS perUnit, url, scraped_at AS scrapedAt
+    FROM prices
+    WHERE id IN (
+      SELECT MAX(id) FROM prices
+      WHERE scraped_at >= datetime('now', '-2 days')
+      GROUP BY store, product, variant, pack_size
+    )
+    ORDER BY store, perUnit ASC
+  `).all();
+}

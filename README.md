@@ -25,6 +25,7 @@ Edit `.env`:
 | `NTFY_TOPIC` | Your unique ntfy.sh topic (keep it secret) | — |
 | `PRICE_THRESHOLD_EUR` | Alert when price/can drops below this | `1.49` |
 | `CHECK_INTERVAL_HOURS` | How often to check (hours) | `2` |
+| `DAILY_SUMMARY_HOUR` | Hour (0-23, server local time) to send the daily price-list summary | `9` |
 | `ADEG_MARKT_URL` | Optional: your local ADEG market's flyer-viewer URL (see [ADEG](#adeg--nahfrisch-best-effort-flyer-only) below) | — |
 
 > **Tip:** pick a hard-to-guess topic name like `monster-alert-austria-xk9q2p`.
@@ -53,7 +54,14 @@ node src/index.js --check-now
 node src/index.js --dry-run --check-now
 ```
 
-### Run as a background daemon (cron every N hours)
+### Send the daily price-list summary now (manual test)
+
+```bash
+node src/index.js --summary-now
+node src/index.js --dry-run --summary-now   # print it instead of sending
+```
+
+### Run as a background daemon (cron every N hours + daily summary)
 
 ```bash
 node src/index.js
@@ -158,6 +166,7 @@ docker compose up -d
    - Is the per-can price >10% below the 7-day rolling average?
 5. A deal triggers a push notification via ntfy.sh with the store name, price, and a direct buy link.
 6. Each unique deal is only notified once (suppressed for 3 days).
+7. Once a day at `DAILY_SUMMARY_HOUR` (default 9:00), a separate notification lists the latest known price per store/variant/pack — regardless of whether it's currently a "deal" — so you always have a full price overview, not just alerts. Based on any price seen in the last 2 days (a store that's been down longer just won't show up that day).
 
 ---
 
@@ -172,6 +181,13 @@ docker compose up -d
 | Lidl | Playwright (rendered DOM) | ✅ |
 | ADEG | Best-effort flyer scan (Playwright) | ❌ mention only |
 | Nah&Frisch | Best-effort flyer scan (PDF text) | ❌ mention only |
+| **marktguru.at** (all chains' in-store flyers) | Playwright (rendered DOM) | ✅ |
+
+### Why marktguru? The shop APIs hide in-store promos
+
+The chains' own shop APIs only reflect **online-shop** prices. In-store flyer promotions — like BILLA "2+2 gratis" (€0.84/can) or SPAR -34% (€1.12/can) — are **not exposed there at all** (verified July 2026: both APIs reported the regular €1.69 with `inPromotion: false` while those promos were running in stores). The marktguru scraper reads the aggregated flyer offers of Billa, Billa Plus, Spar, Eurospar, Interspar, Hofer, Penny, Lidl, ADEG, MPREIS, Metro and more, and is what actually catches in-store deals. Those offers show up with store names like `SPAR (Aktion)` and the flyer validity period.
+
+Note: some promos are app-only/personalized (BILLA App/Vorteilscard "Nur für dich" offers) and are not publicly published anywhere — those cannot be scraped.
 
 ### ADEG / Nah&Frisch: best-effort, flyer-only
 

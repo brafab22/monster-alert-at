@@ -87,3 +87,61 @@ export async function sendFlyerAlert(mention, dryRun = false) {
     console.error(`[notify] Failed to send flyer alert: ${err.message}`);
   }
 }
+
+function formatPriceList(prices) {
+  const byStore = new Map();
+  for (const p of prices) {
+    if (!byStore.has(p.store)) byStore.set(p.store, []);
+    byStore.get(p.store).push(p);
+  }
+
+  const lines = [];
+  for (const [store, items] of byStore) {
+    lines.push(store);
+    for (const p of items) {
+      const packLabel = p.packSize > 1 ? `${p.packSize}-pack` : 'single';
+      const variantLabel = p.variant ? ` ${p.variant}` : '';
+      lines.push(`  ${variantLabel.trim()} (${packLabel}): €${p.priceEur.toFixed(2)} — €${p.perUnit.toFixed(2)}/Dose`);
+    }
+  }
+  return lines.join('\n');
+}
+
+// Daily digest of the latest known price per store/variant/pack, regardless
+// of whether it's currently a "deal". Sent once a day (see CHECK_INTERVAL
+// separate cron in index.js), not deduped since it's expected daily.
+export async function sendDailySummary(prices, dryRun = false) {
+  const title = '📋 Monster-Preise heute';
+
+  if (prices.length === 0) {
+    console.log('[notify] No recent prices to summarize — skipping daily summary');
+    return;
+  }
+
+  const body = formatPriceList(prices);
+
+  if (dryRun) {
+    console.log(`[DRY-RUN] Would send daily summary:\n${title}\n${body}`);
+    return;
+  }
+
+  const topic = process.env.NTFY_TOPIC;
+  if (!topic) {
+    console.error('[notify] NTFY_TOPIC not set in .env');
+    return;
+  }
+
+  try {
+    await axios.post(`${NTFY_BASE}/${topic}`, body, {
+      headers: {
+        Title: title,
+        Priority: 'default',
+        Tags: 'clipboard',
+        'Content-Type': 'text/plain',
+      },
+    });
+    console.log(`[notify] Sent daily summary (${prices.length} price(s))`);
+  } catch (err) {
+    console.error(`[notify] Failed to send daily summary: ${err.message}`);
+  }
+}

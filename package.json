@@ -10,7 +10,9 @@
   "scripts": {
     "start": "node src/index.js",
     "check": "node src/index.js --check-now",
-    "dry-run": "node src/index.js --dry-run --check-now"
+    "dry-run": "node src/index.js --dry-run --check-now",
+    "summary": "node src/index.js --summary-now",
+    "summary-dry-run": "node src/index.js --dry-run --summary-now"
   },
   "dependencies": {
     "axios": "^1.7.2",
